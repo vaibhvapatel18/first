@@ -1,1 +1,70 @@
 
+#Add Restaurants
+class Restaurantadd(viewsets.ModelViewSet):
+    queryset = Restaurant.objects.all()
+    serializer_class = RestaurantSerializer
+    authentication_classes = [BasicAuthentication]
+    permission_classes = [IsAdminUser]
+    def list(self, request, *args, **kwargs):
+        print("HTTP method: ", request.method)
+        return super().list(request, *args, **kwargs)
+
+    def create(self, request, *args, **kwargs):
+        print("HTTP method: ", request.method)
+        return super().create(request, *args, **kwargs)
+
+class Restaurantmanuadd(viewsets.ModelViewSet):
+    serializer_class = MenuItemCreateSerializer
+    authentication_classes = [BasicAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user_restaurant = Restaurant.objects.get(user=self.request.user)
+        queryset = MenuItem.objects.filter(restaurant=user_restaurant)
+        
+        return queryset
+
+    def perform_create(self, serializer):
+        user_restaurant = Restaurant.objects.get(user=self.request.user)
+        serializer.save(restaurant=user_restaurant)
+   
+
+
+
+
+
+
+# class RestaurantSerializer(serializers.ModelSerializer):
+#     # menu_items = MenuItemSerializer(many=True, read_only=True)
+#     # menu_item_count = serializers.SerializerMethodField()
+
+#     class Meta:
+#         model = Restaurant
+#         fields = ['id', 'name', 'description', 'address','phone_number','opening_time','closing_time','like', 'manuiteams']
+
+#     def get_menu_item_count(self, obj):
+#         return obj.menu_items.count()
+
+
+
+class MenuSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MenuItem
+        fields = ['id', 'like','price','name' ]
+
+class RestaurantSerializer(serializers.ModelSerializer):
+    manuiteams = MenuSerializer(many=True,read_only=True)
+    class Meta:
+        model = Restaurant
+        fields = ['id', 'name', 'description','user', 'address','phone_number','opening_time','closing_time', 'manuiteams']
+
+
+class MenuItemCreateSerializer(serializers.ModelSerializer):
+        class Meta:
+            # restaurant = serializers.PrimaryKeyRelatedField(read_only=True)
+            restaurant = serializers.ReadOnlyField(source='restaurant.name')
+            model = MenuItem
+
+
+router.register('restaurantaddmenu', Restaurantmanuadd, basename='restaurantaddmenu')
+
