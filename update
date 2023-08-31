@@ -1,4 +1,83 @@
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.views import APIView
+from apiapp.serializers import UserRegistrationSerializer, UserLoginSerializer,UserProfileSerializer,UserChangePasswordSerializer,SendPasswordEmailSerializer,EmailLinkPasswordResetSerializer,RestaurantSerializer,MenuItemCreateSerializer,UserLikeResSerializer,UserLikeRetaurant,UsersavemenuSerializer,UserLikemenuSerializer
+from django.contrib.auth import authenticate
+from apiapp .renderers import UserRenderer
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.permissions import IsAuthenticated,IsAdminUser
+from apiapp.models import Restaurant,MenuItem,UserLikeRetaurant
+from rest_framework import status
+from rest_framework import viewsets
+from rest_framework.authentication import BasicAuthentication
 
+#generate token manually
+def get_tokens_for_user(user):
+    refresh = RefreshToken.for_user(user)
+
+    return {
+        'refresh': str(refresh),
+        'access': str(refresh.access_token),
+    }
+
+class UserRegistrationView(APIView):
+    renderer_classes = [UserRenderer]
+    def post(self, request, format=None):
+        serializer = UserRegistrationSerializer(data = request.data )
+        if serializer.is_valid(raise_exception=True):
+            user = serializer.save()
+            token = get_tokens_for_user(user)
+            return Response({'token':token, 'msg':'Registration Success'})
+        return Response(serializer.errors)
+    
+
+class UserLoginView(APIView):
+    def post(self, request, format=None):
+        serializer = UserLoginSerializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            email = serializer.data.get('email')
+            password = serializer.data.get('password')
+            user = authenticate(email=email, password=password)
+            if user is not None:
+                token = get_tokens_for_user(user)
+                return Response({'token':token,'msg': 'Login Success'}, status=status.HTTP_200_OK)
+            else:
+                return Response({'errors': {'non_field_errors': ['Email or Password Not Valid']}}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class UserProfileView(APIView):
+    renderer_classes = [UserRenderer]
+    permission_classes = [IsAuthenticated]
+    def get(self, request, format=None):
+        serializer = UserProfileSerializer(request.user)
+        # if serializer.is_valid():
+        return Response(serializer.data)
+    
+class UserChangePasswordView(APIView):
+    renderer_classes = [UserRenderer]
+    permission_classes = [IsAuthenticated]
+    def post(self, request, format=None):
+        serializer = UserChangePasswordSerializer(data = request.data, context={'user':request.user})
+        if serializer.is_valid(raise_exception=True):
+            return Response({'msg':'password change successfully'})
+        return Response(serializer.errors,status=status.HTTP_400_NOT_FOUNDS)
+        
+class SendPasswordEmailView(APIView):
+    renderer_classes = [UserRenderer]
+    def post(self, request, format=True):
+        serializer = SendPasswordEmailSerializer(data = request.data)
+        if serializer.is_valid(raise_exception=True):
+            return Response({'msg':'password reset link send successfully'})
+        return Response(serializer.errors,status=status.HTTP_400_NOT_FOUNDS)
+
+class EmailLinkPasswordResetView(APIView):
+    renderer_classes = [UserRenderer]
+    def post(self, request, uid, token, format=True):
+        serializer = EmailLinkPasswordResetSerializer(data=request.data,context={'uid':uid,'token':token})
+        if serializer.is_valid(raise_exception=True):
+            return Response({'msg':'password reset successfully'})
+        return Response(serializer.errors,status=status.HTTP_400_NOT_FOUNDS)
+    
 #Add Restaurants
 class Restaurantadd(viewsets.ModelViewSet):
     queryset = Restaurant.objects.all()
@@ -28,9 +107,176 @@ class Restaurantmanuadd(viewsets.ModelViewSet):
         user_restaurant = Restaurant.objects.get(user=self.request.user)
         serializer.save(restaurant=user_restaurant)
    
+   
+class UserlikeRestaurant(APIView):
+    renderer_classes = [UserRenderer]
+    def post(self, request, format=None):
+        serializer = UserLikeResSerializer(data = request.data )
+        if serializer.is_valid(raise_exception=True):
+            user = serializer.save()
+            return Response({'msg':'like Restaurant Success'})
+        return Response(serializer.errors)
+
+class Userlikemenuitem(APIView):
+    renderer_classes = [UserRenderer]
+    def post(self, request, format=None):
+        serializer = UserLikemenuSerializer(data = request.data )
+        if serializer.is_valid(raise_exception=True):
+            user = serializer.save()
+            return Response({'msg':'like menu-iteam Success'})
+        return Response(serializer.errors)
+   
+class Usersavemenuitem(APIView):
+    renderer_classes = [UserRenderer]
+    def post(self, request, format=None):
+        serializer = UsersavemenuSerializer(data = request.data )
+        if serializer.is_valid(raise_exception=True):
+            user = serializer.save()
+            return Response({'msg':'like Restaurant Success'})
+        return Response(serializer.errors)
+   
+   
+   
+    # def get_queryset(self):
+    #     # Return the queryset filtered to the currently authenticated user's restaurant
+    #     return Restaurant.objects.filter(user=self.request.user)
+
+    # def create(self, request, *args, **kwargs):
+    #     restaurant = self.get_queryset().first()
+    #     menu_item_serializer = MenuItemCreateSerializer(data=request.data)
+    #     if menu_item_serializer.is_valid():
+    #         menu_item_serializer.save(restaurant=restaurant)
+    #         return Response(menu_item_serializer.data, status=status.HTTP_201_CREATED)
+    #     return Response(menu_item_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    # # authentication_classes = [BasicAuthentication]
+    # permission_classes = [IsAdminUser]
+ 
+# class Restaurantlist(viewsets.ModelViewSet):
+#     # permission_classes = [IsAuthenticated]
+#     queryset = Restaurant.objects.all()
+#     serializer_class = RestaurantSerializer
+
+# class Singerlist(viewsets.ModelViewSet):
+#     permission_classes = [IsAuthenticatedOrReadOnly]
+#     queryset = Singer.objects.all()
+#     serializer_class = SingerSerializer
+
+
+# class MenuListApiView(APIView):
+#     renderer_classes = [UserRenderer]
+#     def get(self, request, format=None):
+#         seri = MenuListApiSerializer(data=request.data)
+#         if seri.is_valid():
+#             return Response(seri.data)
+#         else:
+#             return Response(seri.errors)
+   
 
 
 
+
+from rest_framework import serializers
+from apiapp.models import User,Restaurant,MenuItem,UserLikeRetaurant,Userlikemenuitem
+from django.utils.encoding import smart_str, force_bytes, DjangoUnicodeDecodeError
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from django.core.mail import send_mail 
+from django.conf import settings
+
+class UserRegistrationSerializer(serializers.ModelSerializer):
+    password2 = serializers.CharField(style= {'input_type':'password'}, write_only = True) 
+    class Meta: 
+        model = User
+        fields=['email','name','password','password2', 'tc']
+        extra_kwargs={'write_only':True}
+
+    def validate(self, attrs):
+        password = attrs.get('password') 
+        password2 = attrs.get('password2') 
+        if password != password2:
+            raise serializers.ValidationError("password not match")
+        return attrs
+    def create(self, validate_data):
+        return User.objects.create_user(**validate_data)
+    
+class UserLoginSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(max_length=255)
+    class Meta:
+        model = User
+        fields = ["email", "password"]
+        
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["id", "email", "name"]
+
+class UserChangePasswordSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(max_length=255 ,style={'input_type':'password'},write_only=True)
+    password2 = serializers.CharField(max_length=255 ,style={'input_type':'password'},write_only=True)
+
+    class Meta:
+        model = User
+        fields = ['password','password2']
+
+    def validate(self, attrs):
+        password = attrs.get('password') 
+        password2 = attrs.get('password2') 
+        user = self.context.get('user')
+
+        if password != password2:
+            raise serializers.ValidationError("password not match")
+        user.set_password(password)
+        user.save()
+        return attrs
+
+class SendPasswordEmailSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=255)
+    class Meta:
+        Fields = ['email']
+
+    def validate(self, attrs):
+        email = attrs.get('email') 
+        if User.objects.filter(email=email).exists():
+            user = User.objects.get(email=email)
+            uid = urlsafe_base64_encode(force_bytes(user.id))
+            token = PasswordResetTokenGenerator().make_token(user)
+            link = 'http://localhost:8000/resetpasswordlink/'+uid+'/'+token
+            subject = 'password reset'
+            massage = f"your password reset linl==> {link}"
+            from_email = settings.EMAIL_HOST_USER
+            send_mail(subject, massage, from_email, [user.email])
+            print(link)
+            return attrs
+        else:
+            raise serializers.ValidationError("not register user")
+
+
+class EmailLinkPasswordResetSerializer(serializers.Serializer):
+    password = serializers.CharField(max_length=255 ,style={'input_type':'password'},write_only=True)
+    password2 = serializers.CharField(max_length=255 ,style={'input_type':'password'},write_only=True)
+
+    class Meta:
+        fields = ['password','password2']
+
+    def validate(self, attrs):
+        try:
+            password = attrs.get('password') 
+            password2 = attrs.get('password2') 
+            uid = self.context.get('uid')
+            token = self.context.get('token')
+
+            if password != password2:
+                raise serializers.ValidationError("password not match")
+            id = smart_str(urlsafe_base64_decode(uid))
+            user = User.objects.get(id=id)
+            if not PasswordResetTokenGenerator().check_token(user,token):
+                raise ValueError('token not valid or expired')
+            user.set_password(password)
+            user.save()
+            return attrs
+        except DjangoUnicodeDecodeError as identifier:
+            PasswordResetTokenGenerator().check_token(user,token)
+            raise ValueError('token not valid or expired')
 
 
 
@@ -61,10 +307,72 @@ class RestaurantSerializer(serializers.ModelSerializer):
 
 class MenuItemCreateSerializer(serializers.ModelSerializer):
         class Meta:
-            # restaurant = serializers.PrimaryKeyRelatedField(read_only=True)
             restaurant = serializers.ReadOnlyField(source='restaurant.name')
             model = MenuItem
+            fields = ['restaurant','id','price','name']
 
 
+class UserLikeResSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserLikeRetaurant
+        fields = '__all__'
+    def validate(self, attrs):
+        return attrs
+    def create(self, validate_data):
+        print(validate_data['restaurant'])
+        like = Restaurant.objects.get(name = validate_data['restaurant'])
+        like.like += 1
+        like.save()
+
+        return UserLikeRetaurant.objects.create(**validate_data)
+    
+class UserLikemenuSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Userlikemenuitem
+        fields = '__all__'
+    def validate(self, attrs):
+        return attrs
+    def create(self, validate_data):
+        return Userlikemenuitem.objects.create(**validate_data)
+
+class UsersavemenuSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserLikeRetaurant
+        fields = '__all__'
+    def validate(self, attrs):
+        return attrs
+    def create(self, validate_data):
+        print(validate_data)
+        return Userlikemenuitem.objects.create(**validate_data)
+
+
+
+
+
+
+from django.contrib import admin
+from django.urls import path,include
+from apiapp.views import UserRegistrationView,UserLoginView,UserProfileView,UserChangePasswordView,SendPasswordEmailView,Restaurantadd,EmailLinkPasswordResetView,Restaurantmanuadd,UserlikeRestaurant,Userlikemenuitem,Usersavemenuitem
+from rest_framework.routers import DefaultRouter
+
+router = DefaultRouter()
+
+router.register('restaurantadd', Restaurantadd, basename='restaurantlist')
 router.register('restaurantaddmenu', Restaurantmanuadd, basename='restaurantaddmenu')
+# router.register('userlikerestaurant', UserlikeRestaurant, basename='userlikerestaurant')
+# router.register('userlikemenuitem', Userlikemenuitem, basename='userlikemenuitem')
 
+
+urlpatterns = [
+    path('register/', UserRegistrationView.as_view(), name = 'register'),
+    path('login/', UserLoginView.as_view(), name = 'login'),
+    path('profile/', UserProfileView.as_view(), name = 'profile'),
+    path('changepassword/', UserChangePasswordView.as_view(), name = 'changepassword'),
+    path('resetpasswordlink/', SendPasswordEmailView.as_view(), name = 'resetpasswordlink'),
+    path('resetpasswordemail/<uid>/<token>/', EmailLinkPasswordResetView.as_view(), name='resetpasswordemail'),
+    path('userlikerestaurant/', UserlikeRestaurant.as_view(), name='userlikerestaurant'),
+    path('userlikemenuitem/', Userlikemenuitem.as_view(), name='userlikemenuitem'),
+    path('usersavemenuitem/', Usersavemenuitem.as_view(), name='usersavemenuitem'),
+    path('',include(router.urls)),
+
+]
